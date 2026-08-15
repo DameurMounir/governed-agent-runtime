@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install pinned verification toolchain
+        run: python -m pip install -r requirements-ci.txt -e .
+
+      - name: Repository hygiene
+        run: python scripts/check_repository.py
+
+      - name: Ruff lint
+        run: python -m ruff check .
+
+      - name: Ruff format
+        run: python -m ruff format --check .
+
+      - name: Strict mypy
+        run: python -m mypy
+
+      - name: Tests and branch coverage
+        run: >-
+          python -m pytest
+          --cov=governed_agent_runtime
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=95
+
+      - name: Bandit
+        run: python -m bandit -q -r src
+
+      - name: Secret scan
+        shell: bash
+        run: |
+          detect-secrets scan --all-files --exclude-files '(^|/)\.git/' > /tmp/secrets.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/secrets.json').read_text(encoding='utf-8'))
+          results = data.get('results', {})
+          if results:
+              raise SystemExit(f'detect-secrets findings: {sorted(results)}')
+          print('Secret scan PASS')
+          PY
+
+      - name: Dependency audit
+        run: python -m pip_audit -r requirements-ci.txt
+
+      - name: Build package
+        run: python -m build
+
+      - name: Executable walking slices
+        shell: bash
+        run: |
+          gar demo pass
+          set +e
+          gar demo blocked
+          blocked_rc=$?
+          gar demo fail
+          fail_rc=$?
+          set -e
+          test "$blocked_rc" -eq 3
+          test "$fail_rc" -eq 4

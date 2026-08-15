@@ -1,0 +1,125 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "governed-agent-runtime"
+version = "0.1.0"
+description = "Governed orchestration runtime for evidence-bound multi-agent workflows"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Dameur Mounir" },
+]
+keywords = [
+  "agents",
+  "governance",
+  "orchestration",
+  "evidence",
+  "policy",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/DameurMounir/governed-agent-runtime"
+Issues = "https://github.com/DameurMounir/governed-agent-runtime/issues"
+Repository = "https://github.com/DameurMounir/governed-agent-runtime"
+
+[project.scripts]
+gar = "governed_agent_runtime.cli:entrypoint"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/docs",
+  "/examples",
+  "/scripts",
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/CODE_OF_CONDUCT.md",
+  "/CONTRIBUTING.md",
+  "/SECURITY.md",
+  "/SUPPORT.md",
+  "/GOVERNANCE.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/governed_agent_runtime"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+  "B",
+  "BLE",
+  "C4",
+  "DTZ",
+  "E",
+  "F",
+  "I",
+  "N",
+  "PERF",
+  "PTH",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+  "W",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/governed_agent_runtime/decisions.py" = ["S105"]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+pretty = true
+files = ["src/governed_agent_runtime", "scripts/check_repository.py"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["governed_agent_runtime"]
+omit = ["src/governed_agent_runtime/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = false
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+recursive = true
+skips = []
