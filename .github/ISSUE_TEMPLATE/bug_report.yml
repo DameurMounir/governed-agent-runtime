@@ -1,0 +1,49 @@
+name: Bug report
+description: Report reproducible behavior that contradicts a documented contract
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, private evidence, or security exploit details.
+  - type: input
+    id: version
+    attributes:
+      label: Runtime version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: 3.12.3
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract and reproduction
+      description: Provide a minimal sanitized workflow, authority, and command.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected decision and evidence
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed decision and evidence
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed credentials, personal data, private workflow data, and exploit details.
+          required: true

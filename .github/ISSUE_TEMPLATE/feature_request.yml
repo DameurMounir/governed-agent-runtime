@@ -1,0 +1,42 @@
+name: Governed capability request
+description: Propose a capability with explicit authority, evidence, and effect boundaries
+title: "proposal: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Intended outcome
+      description: Describe the user or system outcome, not only the proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Required authority
+      description: Identify subject, workflow scope, capabilities, expiry, and approvals.
+    validations:
+      required: true
+  - type: dropdown
+    id: effect
+    attributes:
+      label: Highest external effect
+      options:
+        - READ_ONLY
+        - REVERSIBLE
+        - IRREVERSIBLE
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Required evidence and acceptance tests
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Trust boundaries, abuse cases, and residual risks
+    validations:
+      required: true
