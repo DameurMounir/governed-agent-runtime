@@ -2,28 +2,39 @@
 
 ## Direction
 
-The runtime is developed from the governance core outward. Framework integrations are
-adapters behind explicit contracts; they are not allowed to redefine authority, evidence, or
-terminal decision semantics implicitly.
+The runtime is developed from the governance core outward. Framework integrations are adapters
+behind explicit contracts; they are not allowed to redefine authority, evidence, or terminal
+decision semantics implicitly.
 
-Each milestone must deliver an executable walking slice, negative tests, threat analysis, and
-an exact evidence record before the next milestone is represented as complete.
+Each milestone must deliver an executable walking slice, negative tests, threat analysis, and an
+exact evidence record before the next milestone is represented as complete.
+
+## Current integration candidate
+
+`agent/02-langgraph-governed-execution` is a bounded walking-slice branch created after the G0
+foundation. It demonstrates checkpoint persistence, human interruption, context-bound resume,
+durable single-use authority ownership, stored-outcome replay, and in-doubt blocking with local
+SQLite files.
+
+It is **not** a replacement for G1 or G2. The candidate intentionally exposes the contracts and
+failure modes that the production-grade durable store and checkpoint adapter must later satisfy.
 
 ## Branch sequence
 
 | Milestone | Planned branch | Outcome | Minimum acceptance evidence |
 | --- | --- | --- | --- |
 | G0 | `migration/01-foundation-import-v0-1-0` | Typed in-process runtime, policy boundary, evidence ledger, CLI, and three walking slices. | Python 3.12/3.13 CI, strict typing, branch coverage, security gates, package build, and exact terminal semantics. |
+| I1 | `agent/02-langgraph-governed-execution` | Bounded LangGraph checkpoint/interrupt walking slice with a local execution journal. | Restart/resume evidence, strict serializer, context-bound human decision, replay/in-doubt tests, installed-wheel slice, and no production claim. |
 | G1 | `feature/02-durable-authority-store` | Transactional authority consumption and durable evidence persistence. | Replay tests across processes, concurrency tests, rollback evidence, migrations, and failure recovery. |
-| G2 | `feature/03-langgraph-checkpoint-adapter` | Governed checkpoint, resume, interruption, and recovery adapter for graph workflows. | Policy re-evaluation on resume, stale-authority rejection, checkpoint tamper tests, and recovery walking slice. |
+| G2 | `feature/03-langgraph-checkpoint-adapter` | Production-grade governed checkpoint, resume, interruption, and recovery adapter for graph workflows. | Policy re-evaluation on resume, stale-authority rejection, checkpoint tamper tests, migration compatibility, and recovery walking slice. |
 | G3 | `feature/04-langchain-tool-policy` | Tool registration adapter with declared capability, effect class, input contract, and evidence output. | Allowed and denied tool tests, irreversible-effect controls, timeout handling, and sanitized failures. |
 | G4 | `feature/05-deep-agent-supervision` | Supervision and delegation with bounded child authority and explicit escalation. | No privilege amplification, delegation depth limits, human-approval interruption, and attack tests. |
 | G5 | `feature/06-observability-and-evaluation` | Correlated traces, metrics, replayable evaluation cases, and evidence export. | Trace-to-evidence correlation, deterministic replay, evaluation baselines, and privacy controls. |
 | G6 | `feature/07-adversarial-recovery` | Injection resistance, tool-output distrust, partial-failure recovery, and compensation policy. | Adversarial test corpus, recovery walking slices, compensation evidence, and residual-risk review. |
 | G7 | `release/0.2.0` | Versioned integration release after all accepted gates. | Compatibility report, release provenance, signed checksums where supported, and protected normal merge. |
 
-Branch names after G0 are planned names. They are not claims that the corresponding work
-already exists.
+Branch names after the active candidate are planned names. They are not claims that the
+corresponding work already exists.
 
 ## Cross-cutting requirements
 
@@ -40,10 +51,10 @@ Every milestone must preserve:
 
 ## Framework integration rule
 
-LangChain, LangGraph, Deep Agents, model providers, MCP, A2A, queues, databases, and external
-tools may extend execution, but they do not become sources of authority. Every adapter must
-translate external behavior into the runtime's typed capability, effect, evidence, and
-terminal-decision contracts.
+LangChain, LangGraph, Deep Agents, model providers, MCP, A2A, queues, databases, and external tools
+may extend execution, but they do not become sources of authority. Every adapter must translate
+external behavior into the runtime's typed capability, effect, evidence, and terminal-decision
+contracts.
 
 ## Definition of done
 
