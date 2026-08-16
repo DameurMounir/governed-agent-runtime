@@ -1,0 +1,11 @@
+{
+  "authorization_id": "langgraph-example-authority-001",
+  "subject": "governed-runtime",
+  "workflow_id": "langgraph-example-001",
+  "capabilities": [
+    "agent:echo"
+  ],
+  "issued_at": "2026-01-01T00:00:00Z",
+  "expires_at": "2030-01-01T00:00:00Z",
+  "single_use": true
+}

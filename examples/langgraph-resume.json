@@ -1,0 +1,15 @@
+{
+  "thread_id": "langgraph-example-thread-001",
+  "workflow_id": "langgraph-example-001",
+  "step_id": "echo-after-approval",
+  "approved": true,
+  "evidence": [
+    {
+      "kind": "human.approval",
+      "payload": {
+        "approved": true,
+        "reviewer": "named-human-reviewer"
+      }
+    }
+  ]
+}
