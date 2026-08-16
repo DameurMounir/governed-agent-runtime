@@ -15,10 +15,14 @@ jobs:
   quality:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
+      LANGGRAPH_STRICT_MSGPACK: "true"
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_NO_INPUT: "1"
       PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONHASHSEED: "0"
+      SOURCE_DATE_EPOCH: "315532800"
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python
@@ -37,8 +42,26 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-ci.txt
 
-      - name: Install pinned verification toolchain
-        run: python -m pip install -r requirements-ci.txt -e .
+      - name: Install pinned verification and LangGraph toolchain
+        run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip install --no-build-isolation -e '.[langgraph]'
+
+      - name: Verify exact integration versions
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+
+          expected = {
+              "langgraph": "1.2.10",
+              "langgraph-checkpoint": "4.2.0",
+              "langgraph-checkpoint-sqlite": "3.1.1",
+          }
+          actual = {name: version(name) for name in expected}
+          if actual != expected:
+              raise SystemExit(f"LangGraph version mismatch: {actual!r}")
+          print(actual)
+          PY
 
       - name: Repository hygiene
         run: python scripts/check_repository.py
@@ -58,6 +81,7 @@ jobs:
           --cov=governed_agent_runtime
           --cov-branch
           --cov-report=term-missing
+          --cov-report=xml
           --cov-fail-under=95
 
       - name: Bandit
@@ -68,7 +92,7 @@ jobs:
         run: |
           detect-secrets scan \
             --all-files \
-            --exclude-files '(^|/)(\.git|\.mypy_cache|\.pytest_cache|\.ruff_cache|__pycache__)(/|$)' \
+            --exclude-files '(^|/)(\.git|\.mypy_cache|\.pytest_cache|\.ruff_cache|__pycache__|build|dist|dist-a|dist-b)(/|$)' \
             > /tmp/secrets.json
           python - <<'PY'
           import json
@@ -82,20 +106,115 @@ jobs:
           PY
 
       - name: Dependency audit
-        run: python -m pip_audit -r requirements-ci.txt
+        run: |
+          python -m pip_audit -r requirements-ci.txt
+          python -m pip_audit --local --skip-editable
 
-      - name: Build package
-        run: python -m build
-
-      - name: Executable walking slices
+      - name: Deterministic package build
         shell: bash
         run: |
+          set -euo pipefail
+          python -m build --no-isolation --outdir dist-a
+          python -m build --no-isolation --outdir dist-b
+          (cd dist-a && sha256sum * | sort -k2) > /tmp/dist-a.sha256
+          (cd dist-b && sha256sum * | sort -k2) > /tmp/dist-b.sha256
+          diff -u /tmp/dist-a.sha256 /tmp/dist-b.sha256
+          mkdir -p dist
+          cp dist-a/* dist/
+
+      - name: Executable core and LangGraph walking slices
+        shell: bash
+        run: |
+          set -euo pipefail
           gar demo pass
           set +e
           gar demo blocked
           blocked_rc=$?
           gar demo fail
           fail_rc=$?
+          gar-langgraph demo blocked
+          graph_blocked_rc=$?
+          gar-langgraph demo fail
+          graph_fail_rc=$?
           set -e
+          gar-langgraph demo pass
+          gar-langgraph demo resume
           test "$blocked_rc" -eq 3
           test "$fail_rc" -eq 4
+          test "$graph_blocked_rc" -eq 3
+          test "$graph_fail_rc" -eq 4
+
+      - name: Persistent interrupt and resume walking slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_dir="$RUNNER_TEMP/gar-langgraph-${{ matrix.python-version }}"
+          install -d -m 700 "$runtime_dir"
+          set +e
+          gar-langgraph start \
+            --thread-id langgraph-example-thread-001 \
+            --checkpoint-db "$runtime_dir/checkpoints.sqlite" \
+            --journal-db "$runtime_dir/journal.sqlite" \
+            --workflow examples/langgraph-workflow.json \
+            --authority examples/langgraph-authority.json \
+            > "$runtime_dir/start.json"
+          start_rc=$?
+          set -e
+          test "$start_rc" -eq 3
+          gar-langgraph resume \
+            --thread-id langgraph-example-thread-001 \
+            --checkpoint-db "$runtime_dir/checkpoints.sqlite" \
+            --journal-db "$runtime_dir/journal.sqlite" \
+            --resume-contract examples/langgraph-resume.json \
+            > "$runtime_dir/resume.json"
+          gar-langgraph inspect \
+            --thread-id langgraph-example-thread-001 \
+            --checkpoint-db "$runtime_dir/checkpoints.sqlite" \
+            --journal-db "$runtime_dir/journal.sqlite" \
+            > "$runtime_dir/inspect.json"
+          python - "$runtime_dir" <<'PY'
+          import json
+          import stat
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          started = json.loads((root / "start.json").read_text(encoding="utf-8"))
+          resumed = json.loads((root / "resume.json").read_text(encoding="utf-8"))
+          inspected = json.loads((root / "inspect.json").read_text(encoding="utf-8"))
+          assert started["status"] == "INTERRUPTED"
+          assert started["decision"] == "BLOCKED"
+          assert started["interrupts"][0]["thread_id"] == "langgraph-example-thread-001"
+          assert resumed["status"] == "TERMINAL"
+          assert resumed["decision"] == "PASS"
+          assert inspected == resumed
+          for name in ("checkpoints.sqlite", "journal.sqlite"):
+              mode = stat.S_IMODE((root / name).stat().st_mode)
+              assert mode & 0o077 == 0, (name, oct(mode))
+          PY
+
+      - name: Installed-wheel smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel=$(find dist -maxdepth 1 -name '*.whl' -print -quit)
+          test -n "$wheel"
+          smoke="$RUNNER_TEMP/gar-wheel-${{ matrix.python-version }}"
+          python -m venv "$smoke"
+          "$smoke/bin/python" -m pip install \
+            "$wheel" \
+            'langgraph==1.2.10' \
+            'langgraph-checkpoint==4.2.0' \
+            'langgraph-checkpoint-sqlite==3.1.1'
+          LANGGRAPH_STRICT_MSGPACK=true "$smoke/bin/gar" demo pass
+          LANGGRAPH_STRICT_MSGPACK=true "$smoke/bin/gar-langgraph" demo pass
+          LANGGRAPH_STRICT_MSGPACK=true "$smoke/bin/gar-langgraph" demo resume
+
+      - name: Upload coverage from reference runtime
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-python-3.12
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 14

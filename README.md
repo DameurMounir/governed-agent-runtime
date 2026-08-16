@@ -22,8 +22,10 @@ The foundation is deliberately small, deterministic, auditable, and fail-closed.
 control substrate for later LangChain, LangGraph, Deep Agents, tool, model, storage, and
 observability adapters—not a wrapper that grants those integrations implicit authority.
 
-> **Status:** foundation `v0.1.0`. This repository proves the governance core and walking
-> slices. It does not claim distributed or production deployment readiness.
+> **Stable baseline:** foundation `v0.1.0`.
+> **Active candidate:** `agent/02-langgraph-governed-execution`. The candidate adds a pinned,
+> optional LangGraph checkpoint/interrupt adapter and a local durable execution journal. It does
+> not claim distributed or production deployment readiness.
 
 ## Why this exists
 
@@ -76,6 +78,27 @@ The runtime does not discover plugins dynamically, invoke models, deploy service
 itself authority. Integrators register explicit handlers behind typed descriptors, and the
 runtime remains the policy-enforcing boundary.
 
+### Governed LangGraph walking slice
+
+```mermaid
+flowchart LR
+    LG[LangGraph state and routing] --> A[Authority re-evaluation]
+    A --> G[Capability / effect / evidence gate]
+    G -->|missing evidence| I[Persistent interrupt]
+    I -->|bound human resume contract| G
+    G --> J[Durable execution claim]
+    J -->|NEW| H[Registered handler]
+    J -->|sealed outcome| R[Replay without handler]
+    J -->|in-doubt| B[BLOCKED reconciliation]
+    H --> E[Evidence chain]
+    R --> E
+    E --> T[PASS / BLOCKED / FAIL]
+```
+
+LangGraph owns orchestration, checkpoints, and interruption. The governed runtime still owns
+execution authority and terminal semantics. The adapter uses a separate SQLite journal so a
+checkpoint replay does not silently duplicate a completed handler call.
+
 ## Core invariants
 
 | Invariant | Enforcement |
@@ -104,6 +127,8 @@ runtime remains the policy-enforcing boundary.
 - Deterministic `PASS`, `BLOCKED`, and `FAIL` walking slices.
 - Dependency-free runtime package; verification tools remain development-only.
 - Python 3.12 and 3.13 continuous integration.
+- An optional LangGraph integration candidate with strict checkpoint deserialization, context-bound
+  resume contracts, durable authority ownership, stored-outcome replay, and in-doubt blocking.
 
 ## Quick start
 
@@ -123,6 +148,20 @@ gar demo blocked   # exits 3 by design
 
 gar demo fail      # exits 4 by design
 ```
+
+Install and verify the optional LangGraph adapter:
+
+```bash
+python -m pip install -e '.[langgraph]'
+export LANGGRAPH_STRICT_MSGPACK=true
+gar-langgraph demo pass
+gar-langgraph demo blocked   # exits 3 at the evidence interrupt
+gar-langgraph demo resume
+gar-langgraph demo fail      # exits 4 with controlled failure evidence
+```
+
+A persistent start/resume/inspect example is documented in
+[Governed LangGraph execution](docs/langgraph-governed-execution.md).
 
 Persist evidence for a walking slice:
 
@@ -171,16 +210,18 @@ repository gate suite.
 
 ```text
 .
-├── src/governed_agent_runtime/   # Contracts, policy, registry, runtime, evidence, and CLI
-├── tests/                        # Positive, negative, boundary, replay, and failure tests
-├── examples/                     # Executable workflow and authority JSON contracts
+├── src/governed_agent_runtime/   # Core plus optional LangGraph adapter and execution journal
+├── tests/                        # Positive, negative, restart, replay, and failure tests
+├── examples/                     # Core and LangGraph workflow, authority, and resume contracts
 ├── docs/
 │   ├── architecture.md           # Components, sequence, trust boundaries, extension points
 │   ├── threat-model.md           # Assets, threats, controls, residual risks
 │   ├── verification.md           # Local and CI evidence requirements
 │   ├── roadmap.md                # Governed implementation sequence and branch plan
-│   ├── contracts/                # JSON Schema definitions
+│   ├── langgraph-governed-execution.md
+│   ├── contracts/                # JSON Schema definitions, including resume context
 │   ├── decisions/                # Architecture decision records
+│   ├── research/                 # Reviewed framework/security baselines
 │   └── status/                   # Evidence-based implementation status
 ├── scripts/check_repository.py   # Repository hygiene and contract checks
 ├── .github/workflows/ci.yml      # Python 3.12/3.13 quality and safety gates
@@ -207,15 +248,19 @@ The same behavioral foundation is checked locally and on GitHub Actions.
 | Packaging | Source distribution and wheel build successfully |
 | Walking slices | `PASS`, `BLOCKED`, and `FAIL` produce their exact terminal semantics and exit codes |
 
-The foundation contains 69 tests. See [verification](docs/verification.md) for the complete
-gate contract and expected evidence.
+The immutable foundation contains 69 tests. The LangGraph candidate adds restart, interruption,
+resume-binding, path-hardening, in-doubt, and installed-wheel tests; the exact accepted count is
+recorded by CI rather than stated before the branch is verified. See
+[verification](docs/verification.md) for the complete gate contract and expected evidence.
 
 ## Governed roadmap
 
-The implementation roadmap keeps framework adapters behind the governance core:
+The implementation roadmap keeps framework adapters behind the governance core. The active
+`agent/02-langgraph-governed-execution` branch is a bounded walking slice that proves the interface;
+it does not replace the planned production-grade durable-store milestones:
 
 1. durable authority consumption and durable evidence persistence;
-2. LangGraph checkpoint and resume adapter with policy re-evaluation;
+2. production-grade LangGraph checkpoint and resume adapter with policy re-evaluation;
 3. LangChain tool adapters with capability and effect declarations;
 4. Deep Agents supervision and delegation constrained by explicit authority;
 5. observability, replay, evaluation, and adversarial recovery evidence;
@@ -232,7 +277,8 @@ This foundation is an in-process reference runtime. It does **not** yet provide:
 - database-backed evidence storage;
 - cryptographic grant or evidence signatures;
 - remote A2A, MCP, queue, scheduler, or model-provider execution;
-- LangChain, LangGraph, or Deep Agents runtime dependencies;
+- LangChain model/tool integration or Deep Agents supervision;
+- a distributed checkpointer, production authority database, or multi-process SQLite guarantee;
 - multi-tenant isolation, deployment automation, production SLOs, or incident operations.
 
 Those are visible integration boundaries rather than hidden assumptions.
@@ -243,8 +289,12 @@ Those are visible integration boundaries rather than hidden assumptions.
 - [Threat model](docs/threat-model.md)
 - [Verification contract](docs/verification.md)
 - [Implementation roadmap](docs/roadmap.md)
-- [Architecture decision record](docs/decisions/0001-evidence-bound-runtime.md)
+- [Foundation architecture decision](docs/decisions/0001-evidence-bound-runtime.md)
+- [LangGraph authority decision](docs/decisions/0002-langgraph-orchestrates-runtime-authorizes.md)
+- [Governed LangGraph execution](docs/langgraph-governed-execution.md)
+- [LangGraph security baseline](docs/research/langgraph-security-baseline.md)
 - [Foundation status](docs/status/foundation-v0.1.0.md)
+- [LangGraph candidate status](docs/status/langgraph-governed-execution.md)
 - [Governance](GOVERNANCE.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.31.0"]
+requires = ["editables==0.6", "hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -31,6 +31,13 @@ classifiers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+langgraph = [
+  "langgraph==1.2.10",
+  "langgraph-checkpoint==4.2.0",
+  "langgraph-checkpoint-sqlite==3.1.1",
+]
+
 [project.urls]
 Homepage = "https://github.com/DameurMounir/governed-agent-runtime"
 Issues = "https://github.com/DameurMounir/governed-agent-runtime/issues"
@@ -38,6 +45,7 @@ Repository = "https://github.com/DameurMounir/governed-agent-runtime"
 
 [project.scripts]
 gar = "governed_agent_runtime.cli:entrypoint"
+gar-langgraph = "governed_agent_runtime.langgraph_entrypoint:entrypoint"
 
 [tool.hatch.build.targets.sdist]
 include = [

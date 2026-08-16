@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DameurMounir/governed-agent-runtime/blob/main/docs/contracts/langgraph-resume.schema.json",
+  "title": "Governed LangGraph Resume Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "thread_id",
+    "workflow_id",
+    "step_id",
+    "approved",
+    "evidence"
+  ],
+  "properties": {
+    "thread_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Exact persistent thread identity returned by the interrupted run."
+    },
+    "workflow_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Workflow identity from the active interrupt payload."
+    },
+    "step_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Step identity from the active interrupt payload."
+    },
+    "approved": {
+      "type": "boolean",
+      "description": "Explicit human decision for the currently interrupted step."
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "payload"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "payload": {
+            "type": "object",
+            "maxProperties": 128
+          }
+        }
+      }
+    }
+  }
+}

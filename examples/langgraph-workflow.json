@@ -1,0 +1,19 @@
+{
+  "workflow_id": "langgraph-example-001",
+  "correlation_id": "langgraph-correlation-001",
+  "steps": [
+    {
+      "step_id": "echo-after-approval",
+      "agent_id": "builtin.echo",
+      "action": "echo",
+      "capability": "agent:echo",
+      "effect": "READ_ONLY",
+      "requires_evidence_kinds": [
+        "human.approval"
+      ],
+      "input_data": {
+        "message": "governed LangGraph execution"
+      }
+    }
+  ]
+}
