@@ -29,18 +29,33 @@ REQUIRED = (
     "SUPPORT.md",
     "docs/architecture.md",
     "docs/contracts/authority.schema.json",
+    "docs/contracts/langgraph-resume.schema.json",
     "docs/contracts/workflow.schema.json",
     "docs/decisions/0001-evidence-bound-runtime.md",
+    "docs/decisions/0002-langgraph-orchestrates-runtime-authorizes.md",
+    "docs/langgraph-governed-execution.md",
+    "docs/research/langgraph-security-baseline.md",
     "docs/roadmap.md",
     "docs/status/foundation-v0.1.0.md",
+    "docs/status/langgraph-governed-execution.md",
     "docs/threat-model.md",
     "docs/verification.md",
+    "examples/langgraph-authority.json",
+    "examples/langgraph-resume.json",
+    "examples/langgraph-workflow.json",
     "examples/pass-authority.json",
     "examples/pass-workflow.json",
     "pyproject.toml",
     "requirements-ci.txt",
+    "src/governed_agent_runtime/execution_journal.py",
+    "src/governed_agent_runtime/langgraph_adapter.py",
+    "src/governed_agent_runtime/langgraph_cli.py",
+    "src/governed_agent_runtime/langgraph_entrypoint.py",
     "src/governed_agent_runtime/py.typed",
     "src/governed_agent_runtime/runtime.py",
+    "tests/test_execution_journal.py",
+    "tests/test_langgraph_adapter.py",
+    "tests/test_langgraph_cli.py",
     "tests/test_runtime.py",
 )
 README_MARKERS = (
@@ -64,12 +79,20 @@ FORBIDDEN_PARTS = {
     "__pycache__",
     "build",
     "dist",
+    "dist-a",
+    "dist-b",
     "htmlcov",
 }
 TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".txt", ".yaml", ".yml"}
 SCHEMAS = (
     "docs/contracts/workflow.schema.json",
     "docs/contracts/authority.schema.json",
+    "docs/contracts/langgraph-resume.schema.json",
+)
+DIRECT_PINS = (
+    "langgraph==1.2.10",
+    "langgraph-checkpoint==4.2.0",
+    "langgraph-checkpoint-sqlite==3.1.1",
 )
 
 
@@ -83,10 +106,17 @@ def _validate_readme(problems: list[str]) -> None:
     )
     if "```mermaid" not in content:
         problems.append("README architecture diagram missing")
-    if "gar demo pass" not in content or "gar demo blocked" not in content:
-        problems.append("README executable walking-slice commands missing")
-    if "gar demo fail" not in content:
-        problems.append("README FAIL walking-slice command missing")
+    problems.extend(
+        f"README executable command missing: {command}"
+        for command in (
+            "gar demo pass",
+            "gar demo blocked",
+            "gar demo fail",
+            "gar-langgraph demo pass",
+            "gar-langgraph demo resume",
+        )
+        if command not in content
+    )
 
 
 def _validate_schemas(problems: list[str]) -> None:
@@ -100,6 +130,38 @@ def _validate_schemas(problems: list[str]) -> None:
             problems.append(f"schema metadata missing: {relative}")
 
 
+def _validate_langgraph_surface(problems: list[str]) -> None:
+    try:
+        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        requirements = (ROOT / "requirements-ci.txt").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        adapter = (ROOT / "src/governed_agent_runtime/langgraph_adapter.py").read_text(
+            encoding="utf-8"
+        )
+    except OSError as exc:
+        problems.append(f"could not read LangGraph governance surface: {exc}")
+        return
+
+    problems.extend(
+        f"direct LangGraph pin missing or inconsistent: {pin}"
+        for pin in DIRECT_PINS
+        if pin not in pyproject or pin not in requirements
+    )
+    if 'gar-langgraph = "governed_agent_runtime.langgraph_entrypoint:entrypoint"' not in pyproject:
+        problems.append("gar-langgraph console entry point missing")
+    if 'LANGGRAPH_STRICT_MSGPACK: "true"' not in workflow:
+        problems.append("CI strict msgpack setting missing")
+    problems.extend(
+        f"LangGraph serializer implementation marker missing: {marker}"
+        for marker in (
+            "pickle_fallback=False",
+            "allowed_json_modules=None",
+            "allowed_msgpack_modules=None",
+        )
+        if marker not in adapter
+    )
+
+
 def main() -> int:
     """Validate professional repository structure and text-file hygiene."""
 
@@ -111,6 +173,7 @@ def main() -> int:
 
     _validate_readme(problems)
     _validate_schemas(problems)
+    _validate_langgraph_surface(problems)
 
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
