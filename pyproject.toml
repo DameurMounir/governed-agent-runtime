@@ -33,7 +33,7 @@ dependencies = []
 
 [project.optional-dependencies]
 langgraph = [
-  "langgraph==1.2.10",
+  "langgraph==1.2.11",
   "langgraph-checkpoint==4.2.0",
   "langgraph-checkpoint-sqlite==3.1.1",
 ]
