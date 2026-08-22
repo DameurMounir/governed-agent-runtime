@@ -6,7 +6,7 @@ hatchling==1.31.0
 langgraph==1.2.10
 langgraph-checkpoint==4.2.0
 langgraph-checkpoint-sqlite==3.1.1
-mypy==2.3.0
+mypy==2.3.1
 pip-audit==2.10.1
 pytest==9.1.1
 pytest-cov==7.1.0
